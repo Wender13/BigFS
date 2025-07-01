@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package bigfs;
+
+// O cliente fala apenas com o Gateway. ListFiles agora opera em um namespace plano.
+service GatewayService {
+    rpc UploadFile(stream ChunkUploadRequest) returns (SimpleResponse);
+    rpc GetDownloadMap(FileRequest) returns (FileLocationResponse);
+    rpc ListFiles(PathRequest) returns (FileListResponse);
+}
+
+// O Gateway fala com os serviços de backend.
+service MetadataService {
+    rpc RegisterNode(NodeInfo) returns (SimpleResponse) {}
+    rpc GetFileLocation(FileRequest) returns (FileLocationResponse) {}
+    rpc GetWritePlan(FileRequest) returns (FileLocationResponse) {}
+    rpc ListFiles(PathRequest) returns (FileListResponse) {}
+}
+
+service StorageService {
+    rpc StoreChunk(Chunk) returns (SimpleResponse) {}
+    rpc RetrieveChunk(ChunkRequest) returns (Chunk) {}
+}
+
+
+// MENSAGENS
+
+// Heartbeat agora carrega a contagem de chunks.
+message NodeInfo {
+    string address = 1;
+    int32 chunk_count = 2;
+}
+
+message ChunkUploadRequest {
+    oneof content {
+        FileMetadata metadata = 1;
+        bytes data = 2;
+    }
+}
+
+message FileMetadata {
+    string remote_path = 1;
+}
+
+message PathRequest {
+    // Usado para ListFiles, embora o caminho seja ignorado em um namespace plano.
+    string path = 1;
+}
+
+message FileRequest {
+    string filename = 1;
+    int64 size = 2;
+}
+
+message FileListResponse {
+    message FileInfo {
+        string filename = 1;
+        int64 size = 2;
+    }
+    repeated FileInfo files = 1;
+}
+
+message FileLocationResponse {
+    bool is_sharded = 1;
+    repeated ChunkLocation locations = 2;
+}
+
+message ChunkLocation {
+    int32 chunk_index = 1;
+    string chunk_id = 2;
+    string primary_node_id = 3;
+    repeated string replica_node_ids = 4;
+}
+
+message ChunkRequest {
+    string chunk_id = 1;
+}
+
+message Chunk {
+    string chunk_id = 1;
+    bytes data = 2;
+    repeated string replica_node_ids = 3;
+}
+
+message SimpleResponse {
+    bool success = 1;
+    string message = 2;
+}
